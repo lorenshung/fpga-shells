@@ -74,13 +74,17 @@ create_project -part $part_fpga -force $top
 set_param messaging.defaultLimit 1000000
 
 # Set the board part, target language, default library, and IP directory
-# paths for the current project
-set_property -dict [list \
-	BOARD_PART $part_board \
+# paths for the current project. BOARD_PART is skipped for boards
+# without a Vivado board store entry (e.g. custom carriers).
+set project_props [list \
 	TARGET_LANGUAGE {Verilog} \
 	DEFAULT_LIB {xil_defaultlib} \
 	IP_REPO_PATHS $ipdir \
-	] [current_project]
+	]
+if {[info exists part_board] && $part_board ne {}} {
+	lappend project_props BOARD_PART $part_board
+}
+set_property -dict $project_props [current_project]
 
 if {[get_filesets -quiet sources_1] eq ""} {
 	create_fileset -srcset sources_1
