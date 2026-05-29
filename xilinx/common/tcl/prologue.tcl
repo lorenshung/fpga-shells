@@ -74,13 +74,17 @@ create_project -part $part_fpga -force $top
 set_param messaging.defaultLimit 1000000
 
 # Set the board part, target language, default library, and IP directory
-# paths for the current project
+# paths for the current project. BOARD_PART is only set when the board.tcl
+# defines a non-empty $part_board -- boards that drive everything from a raw
+# FPGA part + explicit addPackagePin (e.g. arty_trenz) can leave it empty.
 set_property -dict [list \
-	BOARD_PART $part_board \
 	TARGET_LANGUAGE {Verilog} \
 	DEFAULT_LIB {xil_defaultlib} \
 	IP_REPO_PATHS $ipdir \
 	] [current_project]
+if {[info exists part_board] && $part_board ne ""} {
+	set_property BOARD_PART $part_board [current_project]
+}
 
 if {[get_filesets -quiet sources_1] eq ""} {
 	create_fileset -srcset sources_1
