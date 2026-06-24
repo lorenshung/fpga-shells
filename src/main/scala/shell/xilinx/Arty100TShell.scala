@@ -40,9 +40,51 @@ class SysClockArtyShellPlacer(val shell: Arty100TShellBasicOverlays, val shellIn
   def place(designInput: ClockInputDesignInput) = new SysClockArtyPlacedOverlay(shell, valName.name, designInput, shellInput)
 }
 
+case object ArtyDDRSize extends Field[BigInt](0x40000000L) // 1 GB on TE0712
+class DDRArtyPlacedOverlay(val shell: Arty100TShellBasicOverlays, name: String, val designInput: DDRDesignInput, val shellInput: DDRShellInput)
+  extends DDRPlacedOverlay[XilinxArty100TMIGPads](name, designInput, shellInput)
+{
+  val size = p(ArtyDDRSize)
+
+  val ddrClk1 = shell { ClockSinkNode(freqMHz = 50) } // must equal <InputClkFreq> in the prj
+  val ddrGroup = shell { ClockGroup() }
+  ddrClk1 := di.wrangler := ddrGroup := di.corePLL
+
+  val migParams = XilinxArty100TMIGParams(address = AddressSet.misaligned(di.baseAddress, size))
+  val mig = LazyModule(new XilinxArty100TMIG(migParams))
+  val ddrUI     = shell { ClockSourceNode(freqMHz = 100) } // ui_clk = 800 MHz VCO / 8
+  val areset    = shell { ClockSinkNode(Seq(ClockSinkParameters())) }
+  areset := di.wrangler := ddrUI
+
+  def overlayOutput = DDROverlayOutput(ddr = mig.node)
+  def ioFactory = new XilinxArty100TMIGPads(size)
+
+  shell { InModuleBody {
+    require (shell.sys_clock.get.isDefined, "Use of DDRArtyPlacedOverlay depends on SysClockArtyPlacedOverlay")
+    val (sys, _) = shell.sys_clock.get.get.overlayOutput.node.out(0)
+    val (ui, _) = ddrUI.out(0)
+    val (dclk1, _) = ddrClk1.in(0)
+    val (ar, _) = areset.in(0)
+    val port = mig.module.io.port
+
+    io <> port.viewAsSupertype(new XilinxArty100TMIGPads(mig.depth))
+    ui.clock := port.ui_clk
+    ui.reset := !port.mmcm_locked || port.ui_clk_sync_rst
+    port.sys_clk_i := dclk1.clock.asUInt
+    port.sys_rst := !shell.pllReset // SysResetPolarity = ACTIVE LOW in prj
+    port.aresetn := !(ar.reset.asBool)
+  } }
+
+  shell.sdc.addGroup(clocks = Seq("clk_pll_i"), pins = Seq(mig.island.module.blackbox.io.ui_clk))
+}
+class DDRArtyShellPlacer(val shell: Arty100TShellBasicOverlays, val shellInput: DDRShellInput)(implicit val valName: ValName)
+  extends DDRShellPlacer[Arty100TShellBasicOverlays] {
+  def place(designInput: DDRDesignInput) = new DDRArtyPlacedOverlay(shell, valName.name, designInput, shellInput)
+}
 
 abstract class Arty100TShellBasicOverlays()(implicit p: Parameters) extends Series7Shell {
   val sys_clock = Overlay(ClockInputOverlayKey, new SysClockArtyShellPlacer(this, ClockInputShellInput()))
+  val ddr       = Overlay(DDROverlayKey, new DDRArtyShellPlacer(this, DDRShellInput()))
 }
 
 class Arty100TShell()(implicit p: Parameters) extends Arty100TShellBasicOverlays

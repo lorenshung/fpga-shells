@@ -15,9 +15,7 @@ case class XilinxArty100TMIGParams(
 )
 
 class XilinxArty100TMIGPads(depth : BigInt) extends Arty100TMIGIODDR(depth) {
-  def this(c : XilinxArty100TMIGParams) {
-    this(AddressRange.fromSets(c.address).head.size)
-  }
+  def this(c : XilinxArty100TMIGParams) { this(AddressRange.fromSets(c.address).head.size) }
 }
 
 class XilinxArty100TMIGIO(depth : BigInt) extends Arty100TMIGIODDR(depth) with Arty100TMIGIOClocksReset
@@ -27,8 +25,8 @@ class XilinxArty100TMIGIsland(c : XilinxArty100TMIGParams, val crossing: ClockCr
   require (ranges.size == 1, "DDR range must be contiguous")
   val offset = ranges.head.base
   val depth = ranges.head.size
-  require((depth<=0x10000000L),"artymig supports upto 256 MB depth configuraton")
-  
+  require((depth<=0x40000000L),"trenz supports upto 1 GB depth configuraton")
+
   val device = new MemoryDevice
   val node = AXI4SlaveNode(Seq(AXI4SlavePortParameters(
       slaves = Seq(AXI4SlaveParameters(
@@ -77,7 +75,8 @@ class XilinxArty100TMIGIsland(c : XilinxArty100TMIGParams, val crossing: ClockCr
     //inputs
     //NO_BUFFER clock
     blackbox.io.sys_clk_i     := io.port.sys_clk_i
-    blackbox.io.clk_ref_i     := io.port.clk_ref_i
+    //reference clock loopback: 200 MHz ui_addn_clk_0 -> clk_ref_i (vendor scheme)
+    blackbox.io.clk_ref_i     := blackbox.io.ui_addn_clk_0.asUInt
 
     io.port.ui_clk            := blackbox.io.ui_clk
     io.port.ui_clk_sync_rst   := blackbox.io.ui_clk_sync_rst
