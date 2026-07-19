@@ -11,7 +11,7 @@ import sifive.fpgashells.shell._
 // Minimal shell for a custom XCKU040-1SFVA784C board, modeled on the
 // (Trenz-modified) Arty100TShell. Only provides the 200 MHz LVDS system
 // clock input; UART/JTAG pins are placed by chipyard harness binders.
-class SysClockCustomKU040PlacedOverlay(val shell: CustomKU040ShellBasicOverlays, name: String,
+class SysClockKU040PlacedOverlay(val shell: KU040ShellBasicOverlays, name: String,
       val designInput: ClockInputDesignInput, val shellInput: ClockInputShellInput)
     extends LVDSClockInputXilinxPlacedOverlay(name, designInput, shellInput)
 {
@@ -25,16 +25,16 @@ class SysClockCustomKU040PlacedOverlay(val shell: CustomKU040ShellBasicOverlays,
   } }
 }
 
-class SysClockCustomKU040ShellPlacer(val shell: CustomKU040ShellBasicOverlays, val shellInput: ClockInputShellInput)(implicit val valName: ValName)
-  extends ClockInputShellPlacer[CustomKU040ShellBasicOverlays] {
-  def place(designInput: ClockInputDesignInput) = new SysClockCustomKU040PlacedOverlay(shell, valName.name, designInput, shellInput)
+class SysClockKU040ShellPlacer(val shell: KU040ShellBasicOverlays, val shellInput: ClockInputShellInput)(implicit val valName: ValName)
+  extends ClockInputShellPlacer[KU040ShellBasicOverlays] {
+  def place(designInput: ClockInputDesignInput) = new SysClockKU040PlacedOverlay(shell, valName.name, designInput, shellInput)
 }
 
-abstract class CustomKU040ShellBasicOverlays()(implicit p: Parameters) extends UltraScaleShell {
-  val sys_clock = Overlay(ClockInputOverlayKey, new SysClockCustomKU040ShellPlacer(this, ClockInputShellInput()))
+abstract class KU040ShellBasicOverlays()(implicit p: Parameters) extends UltraScaleShell {
+  val sys_clock = Overlay(ClockInputOverlayKey, new SysClockKU040ShellPlacer(this, ClockInputShellInput()))
 }
 
-class CustomKU040Shell()(implicit p: Parameters) extends CustomKU040ShellBasicOverlays
+class KU040Shell()(implicit p: Parameters) extends KU040ShellBasicOverlays
 {
   val resetPin = InModuleBody { Wire(Bool()) }
   // PLL reset causes
@@ -49,7 +49,7 @@ class CustomKU040Shell()(implicit p: Parameters) extends CustomKU040ShellBasicOv
     override def provideImplicitClockToLazyChildren = true
 
     val sysclk: Clock = sys_clock.get() match {
-      case Some(x: SysClockCustomKU040PlacedOverlay) => x.clock
+      case Some(x: SysClockKU040PlacedOverlay) => x.clock
     }
     val powerOnReset = PowerOnResetFPGAOnly(sysclk)
     sdc.addAsyncPath(Seq(powerOnReset))
