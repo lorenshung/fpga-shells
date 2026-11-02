@@ -43,15 +43,30 @@
 # If flash boot is ever marginal, back CONFIGRATE down the ladder 66 -> 33 ->
 # 22 -> 16 before changing anything else, and try
 # BITSTREAM.CONFIG.SPI_FALL_EDGE {YES}, which buys half a clock of margin.
+# SPI x1, not x4: the module's S25FL256S ships with CR1.QUAD = 0, and in x4
+# the FPGA switches to quad reads after the header and gets garbage on IO2/IO3.
+# Measured 2026-11-01: x4 images never configured (STAT 0x5000190c, DONE=0; an
+# IPROG into one fell back to golden), the same image regenerated for x1 did.
+# Vivado's flash programmer would set QUAD; openFPGALoader 0.x here cannot, and
+# a compressed ~5 MB image loads in well under a second at x1 anyway.
+#
+# Remote updates (RiskyBird ESP link) keep two images in this flash: the golden
+# one at 0 and an update slot at 8 MiB, entered by ICAPE2 IPROG. COMPRESS keeps
+# each image well under 8 MiB (and shortens both the remote write and the boot),
+# and CONFIGFALLBACK makes a failed IPROG load (CRC or ID error) fall back to
+# the golden image instead of leaving the FPGA unconfigured. USR_ACCESS
+# TIMESTAMP is what the ESP link reports as the image identity.
 set_property -dict [list \
 	CFGBVS {VCCO} \
 	CONFIG_VOLTAGE {3.3} \
-	CONFIG_MODE {SPIx4} \
-	BITSTREAM.CONFIG.SPI_BUSWIDTH {4} \
+	CONFIG_MODE {SPIx1} \
+	BITSTREAM.CONFIG.SPI_BUSWIDTH {1} \
 	BITSTREAM.CONFIG.SPI_32BIT_ADDR {YES} \
 	BITSTREAM.CONFIG.CONFIGRATE {66} \
 	BITSTREAM.CONFIG.M0PIN {PULLNONE} \
 	BITSTREAM.CONFIG.M1PIN {PULLNONE} \
 	BITSTREAM.CONFIG.M2PIN {PULLNONE} \
 	BITSTREAM.CONFIG.USR_ACCESS {TIMESTAMP} \
+	BITSTREAM.GENERAL.COMPRESS {TRUE} \
+	BITSTREAM.CONFIG.CONFIGFALLBACK {ENABLE} \
 	] [current_design]
