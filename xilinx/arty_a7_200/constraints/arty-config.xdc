@@ -65,9 +65,12 @@
 # lost while erasing it) has no sync word, and without the watchdog the FPGA
 # scans the flash forever (DONE=0, measured >2.5 min). With it, the IPROG falls
 # back to golden in ~3 s (BOOTSTS 0x0d03: WTO_ERROR, then FALLBACK); the timer
-# value written by golden's header stays armed across the ICAP IPROG. 0x3E030
-# was measured to cover a 4.9 MB x1 image load with margin (3/3 boots); a torn
-# image with its header intact falls back on its CRC error (BOOTSTS 0x2503).
+# value written by golden's header stays armed across the ICAP IPROG, and the
+# slot image's own header re-arms it, so a slot cut short mid-write also falls
+# back (0x0d03, ~2 s). 0x3E030 is long enough for a 4.9 MB x1 image (every valid
+# boot so far); its margin is not measured. A slot with an erased sector in the
+# middle falls back on its CRC error (BOOTSTS 0x2503). JTAG SRAM loads of
+# watchdog images still work.
 set_property -dict [list \
 	CFGBVS {VCCO} \
 	CONFIG_VOLTAGE {3.3} \
